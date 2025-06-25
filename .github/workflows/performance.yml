@@ -1,0 +1,62 @@
+name: Performance Tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    # Run performance tests weekly on Sundays at 3:00 AM UTC
+    - cron: '0 3 * * 0'
+
+jobs:
+  performance-test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
+
+    - name: Restore dependencies
+      run: dotnet restore
+
+    - name: Build in Release mode
+      run: dotnet build --configuration Release --no-restore
+
+    - name: Run performance tests
+      run: |
+        # Create a simple performance test script
+        cat > performance_test.sh << 'EOF'
+        #!/bin/bash
+        
+        echo "=== Analyzer Performance Test ==="
+        echo "Testing analyzer performance with sample projects..."
+        
+        # Time the build process
+        time dotnet build --configuration Release --no-restore --verbosity minimal
+        
+        # Check memory usage during build
+        echo "=== Memory Usage ==="
+        /usr/bin/time -v dotnet build --configuration Release --no-restore --verbosity quiet 2>&1 | grep -E "(Maximum resident set size|User time|System time|Elapsed)"
+        
+        echo "=== Package Size ==="
+        dotnet pack --configuration Release --no-build --output ./perf-test
+        ls -lh ./perf-test/*.nupkg
+        
+        echo "Performance test completed"
+        EOF
+        
+        chmod +x performance_test.sh
+        ./performance_test.sh
+
+    - name: Archive performance results
+      uses: actions/upload-artifact@v4
+      with:
+        name: performance-results-${{ github.run_number }}
+        path: |
+          ./perf-test/*.nupkg

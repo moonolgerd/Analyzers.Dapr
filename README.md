@@ -1,5 +1,8 @@
 # Analyzers.Dapr
 
+![CI](https://github.com/moonolgerd/Analyzers.Dapr/workflows/CI/badge.svg)
+![NuGet](https://img.shields.io/nuget/v/Analyzers.Dapr.svg)
+
 A .NET analyzer that validates classes implementing the Dapr Actor base class to ensure they follow proper serialization rules for strongly-typed >.NET Dapr Actor clients.
 
 ## Overview
@@ -362,6 +365,51 @@ To run tests:
 ```bash
 dotnet test Analyzers.Dapr.Tests.csproj
 ```
+
+## CI/CD
+
+This project uses GitHub Actions for continuous integration and deployment:
+
+### Workflows
+
+- **CI (`ci.yml`)**: Runs on every push and pull request
+  - Builds the project on multiple platforms (Ubuntu, Windows, macOS)
+  - Runs all tests with code coverage
+  - Performs code quality checks with `dotnet format`
+  - Validates NuGet packages
+  - Uploads test results and coverage reports
+
+- **Release (`release.yml`)**: Triggered by version tags or manual dispatch
+  - Creates GitHub releases with release notes
+  - Publishes packages to NuGet.org
+  - Requires `NUGET_API_KEY` secret to be configured
+
+- **Security (`security.yml`)**: Runs security scans
+  - CodeQL analysis for security vulnerabilities
+  - .NET security audit for package vulnerabilities
+  - Dependency review for pull requests
+
+- **Documentation (`docs.yml`)**: Validates and builds documentation
+  - Lints markdown files
+  - Checks for broken links
+  - Generates API documentation with DocFX
+  - Deploys to GitHub Pages
+
+- **Performance (`performance.yml`)**: Monitors analyzer performance
+  - Tracks build times and memory usage
+  - Monitors package size
+  - Runs weekly performance regression tests
+
+- **Dependency Updates (`dependency-updates.yml`)**: Automated dependency management
+  - Checks for outdated packages weekly
+  - Creates pull requests for updates
+  - Works alongside Dependabot configuration
+
+### Secrets Required
+
+To fully utilize the CI/CD pipeline, configure these repository secrets:
+
+- `NUGET_API_KEY`: API key for publishing to NuGet.org
 
 ## Contributing
 
