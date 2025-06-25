@@ -20,7 +20,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Dapr.Analyzers\Dapr.Analyzers.csproj" />
+    <ProjectReference Include="..\Analyzers.Dapr\Analyzers.Dapr.csproj" />
   </ItemGroup>
 
 </Project>
