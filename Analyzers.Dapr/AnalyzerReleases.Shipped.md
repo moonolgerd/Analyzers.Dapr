@@ -1,3 +1,12 @@
+## Release 1.1
+
+### Changed Rules
+
+Rule ID | Category | Severity | Notes
+--------|----------|----------|-------
+DAPR008 | Serialization | Warning | Scope narrowed: only fires when record is used in a public IActor interface method
+DAPR010 | Serialization | Error | Scope narrowed: only fires when type is used in a public IActor interface method
+
 ## Release 1.0
 
 ### New Rules

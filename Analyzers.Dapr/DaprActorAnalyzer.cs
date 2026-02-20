@@ -122,7 +122,6 @@ public class DaprActorAnalyzer : DiagnosticAnalyzer
         context.RegisterSyntaxNodeAction(AnalyzeClassDeclaration, SyntaxKind.ClassDeclaration);
         context.RegisterSyntaxNodeAction(AnalyzeInterfaceDeclaration, SyntaxKind.InterfaceDeclaration);
         context.RegisterSyntaxNodeAction(AnalyzeEnumDeclaration, SyntaxKind.EnumDeclaration);
-        context.RegisterSyntaxNodeAction(AnalyzeRecordDeclaration, SyntaxKind.RecordDeclaration);
     }
 
     private static void AnalyzeClassDeclaration(SyntaxNodeAnalysisContext context)
@@ -197,21 +196,6 @@ public class DaprActorAnalyzer : DiagnosticAnalyzer
         }
     }
 
-    private static void AnalyzeRecordDeclaration(SyntaxNodeAnalysisContext context)
-    {
-        var recordDeclaration = (RecordDeclarationSyntax)context.Node;
-        var semanticModel = context.SemanticModel;
-        var recordSymbol = semanticModel.GetDeclaredSymbol(recordDeclaration);
-
-        if (recordSymbol == null) return;
-
-        // Check if record is used in Actor context
-        if (IsUsedInActorContext(recordSymbol))
-        {
-            CheckRecordForDataContractAttributes(context, recordDeclaration, recordSymbol);
-        }
-    }
-
     private static bool InheritsFromActor(INamedTypeSymbol classSymbol)
     {
         var baseType = classSymbol.BaseType;
@@ -271,27 +255,24 @@ public class DaprActorAnalyzer : DiagnosticAnalyzer
 
     private static void CheckActorMethodTypes(SyntaxNodeAnalysisContext context, INamedTypeSymbol classSymbol)
     {
-        foreach (var method in classSymbol.GetMembers().OfType<IMethodSymbol>())
-        {
-            if (method.DeclaredAccessibility == Accessibility.Public &&
-                !method.IsStatic &&
-                method.MethodKind != MethodKind.Constructor &&
-                method.Name != "GetHashCode" &&
-                method.Name != "Equals" &&
-                method.Name != "ToString" &&
-                method.Name != "GetType")
-            {
-                // Check return type
-                if (!method.ReturnsVoid)
-                {
-                    CheckMethodReturnType(context, method);
-                }
+        // Only check methods that are part of an IActor interface contract
+        var iActorInterfaces = classSymbol.AllInterfaces.Where(InheritsFromIActor).ToList();
 
-                // Check parameter types
-                foreach (var parameter in method.Parameters)
-                {
-                    CheckMethodParameter(context, method, parameter);
-                }
+        foreach (var interfaceMethod in iActorInterfaces.SelectMany(i => i.GetMembers().OfType<IMethodSymbol>()))
+        {
+            var implementation = classSymbol.FindImplementationForInterfaceMember(interfaceMethod) as IMethodSymbol;
+            if (implementation == null) continue;
+
+            // Check return type
+            if (!implementation.ReturnsVoid)
+            {
+                CheckMethodReturnType(context, implementation);
+            }
+
+            // Check parameter types
+            foreach (var parameter in implementation.Parameters)
+            {
+                CheckMethodParameter(context, implementation, parameter);
             }
         }
     }
@@ -339,6 +320,13 @@ public class DaprActorAnalyzer : DiagnosticAnalyzer
         if (type is INamedTypeSymbol namedType &&
             (namedType.TypeKind == TypeKind.Class || namedType.TypeKind == TypeKind.Struct))
         {
+            // DAPR008: Record types used in Actor methods must have DataContract/DataMember attributes
+            if (namedType.IsRecord)
+            {
+                CheckRecordSymbolForDataContractAttributes(context, namedType, location);
+                return;
+            }
+
             // DAPR010: Check if type has parameterless constructor or DataContract attribute
             if (!HasParameterlessConstructorOrDataContract(namedType))
             {
@@ -448,72 +436,27 @@ public class DaprActorAnalyzer : DiagnosticAnalyzer
                typeName == "System.Void";
     }
 
-    private static bool IsUsedInActorContext(INamedTypeSymbol recordSymbol)
+    private static void CheckRecordSymbolForDataContractAttributes(SyntaxNodeAnalysisContext context, INamedTypeSymbol recordType, Location usageLocation)
     {
-        // For simplicity, we'll check if this record type is used in any Actor-related context
-        // In a more comprehensive analyzer, you might want to check if it's used as parameter/return type in Actor methods
-        return true; // For now, we'll check all records - you can make this more specific
-    }
-
-    private static void CheckRecordForDataContractAttributes(SyntaxNodeAnalysisContext context, RecordDeclarationSyntax recordDeclaration, INamedTypeSymbol recordSymbol)
-    {
-        // Check if record has DataContract attribute
-        if (!HasAttribute(recordSymbol, "DataContractAttribute", "DataContract"))
+        // DAPR008: record must carry [DataContract]
+        if (!HasAttribute(recordType, "DataContractAttribute", "DataContract"))
         {
-            var diagnostic = Diagnostic.Create(
+            context.ReportDiagnostic(Diagnostic.Create(
                 RecordTypeNeedsDataContractAttributes,
-                recordDeclaration.Identifier.GetLocation(),
-                recordSymbol.Name);
-            context.ReportDiagnostic(diagnostic);
+                usageLocation,
+                recordType.Name));
             return;
         }
 
-        // Check if record parameters have DataMember attributes
-        CheckRecordParametersForDataMember(context, recordDeclaration, recordSymbol);
-    }
-
-    private static void CheckRecordParametersForDataMember(SyntaxNodeAnalysisContext context, RecordDeclarationSyntax recordDeclaration, INamedTypeSymbol recordSymbol)
-    {
-        // For record types, we need to check the primary constructor parameters
-        if (recordDeclaration.ParameterList != null)
+        // Every public property must carry [DataMember]
+        foreach (var property in recordType.GetMembers().OfType<IPropertySymbol>()
+            .Where(p => p.DeclaredAccessibility == Accessibility.Public && !HasDataMemberAttribute(p)))
         {
-            foreach (var parameter in recordDeclaration.ParameterList.Parameters)
-            {
-                // Get the corresponding property symbol
-                var propertyName = parameter.Identifier.ValueText;
-                var property = recordSymbol.GetMembers().OfType<IPropertySymbol>()
-                    .FirstOrDefault(p => p.Name == propertyName);
-
-                if (property != null && !HasDataMemberAttribute(property))
-                {
-                    var diagnostic = Diagnostic.Create(
-                        RecordTypeNeedsDataContractAttributes,
-                        parameter.GetLocation(),
-                        recordSymbol.Name);
-                    context.ReportDiagnostic(diagnostic);
-                }
-            }
-        }
-
-        // Also check regular properties if any
-        foreach (var property in recordSymbol.GetMembers().OfType<IPropertySymbol>())
-        {
-            if (property.DeclaredAccessibility == Accessibility.Public &&
-                !HasDataMemberAttribute(property))
-            {
-                var propertyDeclaration = recordDeclaration.DescendantNodes()
-                    .OfType<PropertyDeclarationSyntax>()
-                    .FirstOrDefault(p => p.Identifier.ValueText == property.Name);
-
-                if (propertyDeclaration != null)
-                {
-                    var diagnostic = Diagnostic.Create(
-                        RecordTypeNeedsDataContractAttributes,
-                        propertyDeclaration.Identifier.GetLocation(),
-                        recordSymbol.Name);
-                    context.ReportDiagnostic(diagnostic);
-                }
-            }
+            var propLocation = property.Locations.FirstOrDefault() ?? usageLocation;
+            context.ReportDiagnostic(Diagnostic.Create(
+                RecordTypeNeedsDataContractAttributes,
+                propLocation,
+                recordType.Name));
         }
     }
 

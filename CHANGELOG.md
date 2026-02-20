@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-02-19
+
+### Changed
+- **DAPR008**: Narrowed scope — now only raised when a record type is used as a parameter or return type in a public IActor interface method. Standalone records that are not part of an IActor contract are no longer flagged.
+- **DAPR010**: Narrowed scope — now only raised for types used in methods that implement an IActor interface. Public helper methods on the Actor class that are not part of the IActor contract are no longer flagged.
+
 ### Added
 - GitHub Actions CI/CD workflows
 - Automated dependency updates with Dependabot
@@ -34,5 +40,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - NuGet package configuration
 - Documentation and examples
 
-[Unreleased]: https://github.com/moonolgerd/Analyzers.Dapr/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/moonolgerd/Analyzers.Dapr/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/moonolgerd/Analyzers.Dapr/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/moonolgerd/Analyzers.Dapr/releases/tag/v1.0.0

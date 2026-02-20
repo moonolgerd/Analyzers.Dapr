@@ -14,7 +14,7 @@
 
   <PropertyGroup>
     <PackageId>Analyzers.Dapr</PackageId>
-    <PackageVersion>1.0.0</PackageVersion>
+    <PackageVersion>1.1.0</PackageVersion>
     <Authors>moonolgerd</Authors>
     <PackageDescription>Roslyn analyzers for validating Dapr Actor implementations and ensuring best practices</PackageDescription>
     <PackageProjectUrl>https://github.com/moonolgerd/Analyzers.Dapr</PackageProjectUrl>
@@ -23,7 +23,7 @@
     <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
     <PackageReleaseNotes>Initial release of Dapr analyzers for validating Actor implementations</PackageReleaseNotes>
     <PackageTags>dapr, analyzers, roslyn, actors, microservices</PackageTags>
-    <Copyright>Copyright (c) 2025 moonolgerd</Copyright>
+    <Copyright>Copyright (c) 2026 moonolgerd</Copyright>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>

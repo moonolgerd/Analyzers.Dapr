@@ -299,10 +299,24 @@ namespace Test
     {
         var code = @"
 using System;
+using Dapr.Actors;
+using Dapr.Actors.Runtime;
+using System.Threading.Tasks;
 
 namespace Test
 {
     public record Doodad(Guid Id, string Name, int Count);
+
+    public interface IDoodadActor : IActor
+    {
+        Task<Doodad> GetAsync();
+    }
+
+    public class DoodadActor : Actor, IDoodadActor
+    {
+        public DoodadActor(ActorHost host) : base(host) { }
+        public Task<Doodad> GetAsync() => Task.FromResult(new Doodad(Guid.NewGuid(), "", 0));
+    }
 }";
 
         var diagnostics = await GetDiagnosticsAsync(code);
@@ -313,16 +327,46 @@ namespace Test
     }
 
     [TestMethod]
+    public async Task RecordNotUsedInActorMethod_ShouldNotReportDAPR008()
+    {
+        var code = @"
+using System;
+
+namespace Test
+{
+    public record Standalone(Guid Id, string Name);
+}";
+        var diagnostics = await GetDiagnosticsAsync(code);
+        var dapr008Diagnostics = diagnostics.Where(d => d.Id == "DAPR008").ToArray();
+
+        Assert.AreEqual(0, dapr008Diagnostics.Length, "Should not report DAPR008 for records not used in public Dapr actor methods");
+    }
+
+    [TestMethod]
     public async Task RecordWithDataContractButMissingDataMember_ShouldReportDAPR008()
     {
         var code = @"
 using System;
+using Dapr.Actors;
+using Dapr.Actors.Runtime;
 using System.Runtime.Serialization;
+using System.Threading.Tasks;
 
 namespace Test
 {
     [DataContract]
     public record Doodad(Guid Id, string Name, int Count);
+
+    public interface IDoodadActor : IActor
+    {
+        Task<Doodad> GetAsync();
+    }
+
+    public class DoodadActor : Actor, IDoodadActor
+    {
+        public DoodadActor(ActorHost host) : base(host) { }
+        public Task<Doodad> GetAsync() => Task.FromResult(new Doodad(Guid.NewGuid(), "", 0));
+    }
 }";
         var diagnostics = await GetDiagnosticsAsync(code);
         var dapr008Diagnostics = diagnostics.Where(d => d.Id == "DAPR008").ToArray();
@@ -335,7 +379,10 @@ namespace Test
     {
         var code = @"
 using System;
+using Dapr.Actors;
+using Dapr.Actors.Runtime;
 using System.Runtime.Serialization;
+using System.Threading.Tasks;
 
 namespace Test
 {
@@ -344,6 +391,17 @@ namespace Test
         [property: DataMember] Guid Id,
         [property: DataMember] string Name,
         [property: DataMember] int Count);
+
+    public interface IDoodadActor : IActor
+    {
+        Task<Doodad> GetAsync();
+    }
+
+    public class DoodadActor : Actor, IDoodadActor
+    {
+        public DoodadActor(ActorHost host) : base(host) { }
+        public Task<Doodad> GetAsync() => Task.FromResult(new Doodad(Guid.NewGuid(), "", 0));
+    }
 }";
         var diagnostics = await GetDiagnosticsAsync(code);
         var dapr008Diagnostics = diagnostics.Where(d => d.Id == "DAPR008").ToArray();

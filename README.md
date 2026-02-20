@@ -211,7 +211,7 @@ public interface IWeatherActor : IActor
 ### DAPR008 - Record types should use DataContract and DataMember attributes
 **Severity:** Warning
 
-Record types used in Actor methods should have `[DataContract]` attribute and `[DataMember]` attributes on all properties for reliable serialization.
+Record types used as parameters or return types in **public IActor interface methods** should have `[DataContract]` attribute and `[DataMember]` attributes on all properties for reliable serialization. Records that are not part of an IActor contract are not flagged.
 
 **Bad:**
 ```csharp
@@ -219,14 +219,14 @@ public record WeatherData(double Temperature, int Humidity);
 
 public interface IWeatherActor : IActor
 {
-    Task<WeatherData> GetWeatherAsync();
+    Task<WeatherData> GetWeatherAsync(); // WeatherData is used here — triggers DAPR008
 }
 ```
 
 **Good:**
 ```csharp
 [DataContract]
-public record WeatherData([DataMember] double Temperature, [DataMember] int Humidity);
+public record WeatherData([property: DataMember] double Temperature, [property: DataMember] int Humidity);
 
 public interface IWeatherActor : IActor
 {
@@ -267,7 +267,7 @@ public class WeatherActor : Actor, IWeatherActor
 ### DAPR010 - Types must have parameterless constructor or DataContract attribute
 **Severity:** Error
 
-All types used in Actor methods must either expose a public parameterless constructor or be decorated with the `[DataContract]` attribute for reliable serialization.
+Types used as parameters or return types in **public IActor interface methods** must either expose a public parameterless constructor or be decorated with the `[DataContract]` attribute for reliable serialization. Types that are not part of an IActor contract are not flagged.
 
 **Bad:**
 ```csharp
