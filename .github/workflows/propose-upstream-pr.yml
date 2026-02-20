@@ -1,0 +1,151 @@
+name: Propose Upstream PR to dapr/dotnet-sdk
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch name to create in dapr/dotnet-sdk fork'
+        required: false
+        default: 'feat/add-actor-serialization-analyzers'
+        type: string
+      base_branch:
+        description: 'Target base branch in dapr/dotnet-sdk (e.g. master, main)'
+        required: false
+        default: 'master'
+        type: string
+      dry_run:
+        description: 'Dry run (skip PR creation)'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  propose-upstream-pr:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Analyzers.Dapr
+        uses: actions/checkout@v4
+        with:
+          path: analyzers-dapr
+
+      - name: Checkout dapr/dotnet-sdk
+        uses: actions/checkout@v4
+        with:
+          repository: dapr/dotnet-sdk
+          path: dotnet-sdk
+          ref: ${{ inputs.base_branch }}
+          token: ${{ secrets.UPSTREAM_PR_TOKEN }}
+
+      - name: Configure git identity
+        run: |
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
+
+      - name: Create feature branch in dotnet-sdk
+        working-directory: dotnet-sdk
+        run: |
+          git checkout -b "${{ inputs.branch }}"
+
+      - name: Copy adapter files into dotnet-sdk
+        run: |
+          DEST="dotnet-sdk/src/Dapr.Actors.Analyzers/Dapr.Actors.Analyzers"
+          cp analyzers-dapr/upstream-pr/ActorSerializationAnalyzer.cs "$DEST/ActorSerializationAnalyzer.cs"
+          cp analyzers-dapr/upstream-pr/ActorSerializationCodeFixProvider.cs "$DEST/ActorSerializationCodeFixProvider.cs"
+
+      - name: Update AnalyzerReleases.Unshipped.md
+        working-directory: dotnet-sdk/src/Dapr.Actors.Analyzers/Dapr.Actors.Analyzers
+        run: |
+          cat >> AnalyzerReleases.Unshipped.md << 'EOF'
+
+          ## Unshipped
+
+          ### New Rules
+
+          Rule ID  | Category | Severity | Notes
+          ---------|----------|----------|-----------------------------------------------
+          DAPR1405 | Usage    | Error    | Actor interface should inherit from IActor
+          DAPR1406 | Usage    | Warning  | Enum members in Actor types should use EnumMember attribute
+          DAPR1407 | Usage    | Info     | Consider using JsonPropertyName for property name consistency
+          DAPR1408 | Usage    | Warning  | Complex types used in Actor methods need serialization attributes
+          DAPR1409 | Usage    | Warning  | Actor method parameter needs proper serialization attributes
+          DAPR1410 | Usage    | Warning  | Actor method return type needs proper serialization attributes
+          DAPR1411 | Usage    | Warning  | Collection types in Actor methods need element type validation
+          DAPR1412 | Usage    | Warning  | Record types should use DataContract and DataMember attributes for Actor serialization
+          DAPR1413 | Usage    | Error    | Actor class implementation should implement an interface that inherits from IActor
+          DAPR1414 | Usage    | Error    | All types must either expose a public parameterless constructor or be decorated with DataContractAttribute
+          EOF
+
+      - name: Commit changes
+        working-directory: dotnet-sdk
+        run: |
+          git add src/Dapr.Actors.Analyzers/Dapr.Actors.Analyzers/ActorSerializationAnalyzer.cs
+          git add src/Dapr.Actors.Analyzers/Dapr.Actors.Analyzers/ActorSerializationCodeFixProvider.cs
+          git add src/Dapr.Actors.Analyzers/Dapr.Actors.Analyzers/AnalyzerReleases.Unshipped.md
+          git commit -m "feat(analyzers): add Actor serialization analyzers DAPR1405-DAPR1414
+
+          Adds ten new Roslyn analyzers for Dapr Actor serialization validation,
+          ported from https://github.com/moonolgerd/Analyzers.Dapr:
+
+          - DAPR1405: Actor interface should inherit from IActor (Error)
+          - DAPR1406: Enum members should use [EnumMember] attribute (Warning)
+          - DAPR1407: Consider using [JsonPropertyName] attribute (Info)
+          - DAPR1408: Complex types need serialization attributes (Warning)
+          - DAPR1409: Actor method parameter needs serialization attributes (Warning)
+          - DAPR1410: Actor method return type needs serialization attributes (Warning)
+          - DAPR1411: Collection element types need serialization attributes (Warning)
+          - DAPR1412: Record types need [DataContract]/[DataMember] attributes (Warning)
+          - DAPR1413: Actor class must implement an IActor interface (Error)
+          - DAPR1414: Types need parameterless constructor or [DataContract] (Error)"
+
+      - name: Push feature branch
+        if: ${{ !inputs.dry_run }}
+        working-directory: dotnet-sdk
+        run: |
+          git remote set-url origin "https://x-access-token:${{ secrets.UPSTREAM_PR_TOKEN }}@github.com/dapr/dotnet-sdk.git"
+          git push origin "${{ inputs.branch }}"
+
+      - name: Create Pull Request
+        if: ${{ !inputs.dry_run }}
+        env:
+          GH_TOKEN: ${{ secrets.UPSTREAM_PR_TOKEN }}
+        run: |
+          cd dotnet-sdk
+          gh pr create \
+            --repo dapr/dotnet-sdk \
+            --head "${{ inputs.branch }}" \
+            --base "${{ inputs.base_branch }}" \
+            --title "feat(analyzers): add Actor serialization analyzers (DAPR1405-DAPR1414)" \
+            --body "## Summary
+
+          This PR adds ten new Roslyn analyzers for Dapr Actor serialization validation, ported from [moonolgerd/Analyzers.Dapr](https://github.com/moonolgerd/Analyzers.Dapr).
+
+          These analyzers help developers follow the [Dapr Actor Serialization guidelines](https://docs.dapr.io/developing-applications/sdks/dotnet/dotnet-actors/dotnet-actors-serialization/) by surfacing issues at compile time.
+
+          ## New Rules
+
+          | Rule ID  | Severity | Description |
+          |----------|----------|-------------|
+          | DAPR1405 | Error    | Actor interface should inherit from \`IActor\` |
+          | DAPR1406 | Warning  | Enum members in Actor types should use \`[EnumMember]\` attribute |
+          | DAPR1407 | Info     | Consider using \`[JsonPropertyName]\` for property name consistency |
+          | DAPR1408 | Warning  | Complex types used in Actor methods need serialization attributes |
+          | DAPR1409 | Warning  | Actor method parameter needs proper serialization attributes |
+          | DAPR1410 | Warning  | Actor method return type needs proper serialization attributes |
+          | DAPR1411 | Warning  | Collection types in Actor methods need element type validation |
+          | DAPR1412 | Warning  | Record types should use \`[DataContract]\` and \`[DataMember]\` attributes |
+          | DAPR1413 | Error    | Actor class must implement an interface that inherits from \`IActor\` |
+          | DAPR1414 | Error    | Types must have a public parameterless constructor or \`[DataContract]\` attribute |
+
+          ## Code Fixes
+
+          Automatic code fixes are provided for DAPR1405, DAPR1406, DAPR1407, DAPR1408, DAPR1409, DAPR1410, and DAPR1412.
+
+          ## Notes
+
+          - All new analyzers live in \`ActorSerializationAnalyzer\` and \`ActorSerializationCodeFixProvider\` in \`src/Dapr.Actors.Analyzers/Dapr.Actors.Analyzers/\`
+          - IDs continue the existing DAPR14xx series (DAPR1405–DAPR1414)
+          - No changes to existing analyzers or tests"
