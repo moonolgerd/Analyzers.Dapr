@@ -4,7 +4,7 @@ using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System.Collections.Immutable;
 
-namespace Dapr.Analyzers.Tests;
+namespace Dapr.Actors.Analyzers.Tests;
 
 [TestClass]
 public class DaprActorAnalyzerTests
@@ -29,7 +29,7 @@ public class DaprActorAnalyzerTests
             references,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 
-        var analyzer = new DaprActorAnalyzer();
+        var analyzer = new ActorSerializationAnalyzer();
         var compilationWithAnalyzers = compilation.WithAnalyzers(
             ImmutableArray.Create<DiagnosticAnalyzer>(analyzer));
 
@@ -38,7 +38,7 @@ public class DaprActorAnalyzerTests
     }
 
     [TestMethod]
-    public async Task ActorInterface_WithoutIActor_ShouldReportDAPR001()
+    public async Task ActorInterface_WithoutIActor_ShouldReportDAPR1405()
     {
         var code = @"
 using Dapr.Actors;
@@ -60,14 +60,14 @@ namespace Test
 }";
 
         var diagnostics = await GetDiagnosticsAsync(code);
-        var dapr001 = diagnostics.FirstOrDefault(d => d.Id == "DAPR001");
+        var dapr1405 = diagnostics.FirstOrDefault(d => d.Id == "DAPR1405");
 
-        Assert.IsNotNull(dapr001, "Expected DAPR001 diagnostic for interface missing IActor inheritance");
-        Assert.IsTrue(dapr001.GetMessage().Contains("ITestActor"));
+        Assert.IsNotNull(dapr1405, "Expected DAPR1405 diagnostic for interface missing IActor inheritance");
+        Assert.IsTrue(dapr1405.GetMessage().Contains("ITestActor"));
     }
 
     [TestMethod]
-    public async Task EnumWithoutEnumMember_ShouldReportDAPR002()
+    public async Task EnumWithoutEnumMember_ShouldReportDAPR1406()
     {
         var code = @"
 namespace Test
@@ -80,15 +80,15 @@ namespace Test
 }";
 
         var diagnostics = await GetDiagnosticsAsync(code);
-        var dapr002Diagnostics = diagnostics.Where(d => d.Id == "DAPR002").ToArray();
+        var dapr1406Diagnostics = diagnostics.Where(d => d.Id == "DAPR1406").ToArray();
 
-        Assert.AreEqual(2, dapr002Diagnostics.Length, "Expected DAPR002 diagnostics for enum members without EnumMember attribute");
-        Assert.IsTrue(dapr002Diagnostics.Any(d => d.GetMessage().Contains("Value1")));
-        Assert.IsTrue(dapr002Diagnostics.Any(d => d.GetMessage().Contains("Value2")));
+        Assert.AreEqual(2, dapr1406Diagnostics.Length, "Expected DAPR1406 diagnostics for enum members without EnumMember attribute");
+        Assert.IsTrue(dapr1406Diagnostics.Any(d => d.GetMessage().Contains("Value1")));
+        Assert.IsTrue(dapr1406Diagnostics.Any(d => d.GetMessage().Contains("Value2")));
     }
 
     [TestMethod]
-    public async Task ActorMethodWithComplexParameter_ShouldReportDAPR005()
+    public async Task ActorMethodWithComplexParameter_ShouldReportDAPR1409()
     {
         var code = @"
 using Dapr.Actors;
@@ -117,14 +117,14 @@ namespace Test
 }";
 
         var diagnostics = await GetDiagnosticsAsync(code);
-        var dapr005 = diagnostics.FirstOrDefault(d => d.Id == "DAPR005");
+        var dapr1409 = diagnostics.FirstOrDefault(d => d.Id == "DAPR1409");
 
-        Assert.IsNotNull(dapr005, "Expected DAPR005 diagnostic for method parameter without serialization attributes");
-        Assert.IsTrue(dapr005.GetMessage().Contains("ComplexType"));
+        Assert.IsNotNull(dapr1409, "Expected DAPR1409 diagnostic for method parameter without serialization attributes");
+        Assert.IsTrue(dapr1409.GetMessage().Contains("ComplexType"));
     }
 
     [TestMethod]
-    public async Task ActorMethodWithComplexReturnType_ShouldReportDAPR006()
+    public async Task ActorMethodWithComplexReturnType_ShouldReportDAPR1410()
     {
         var code = @"
 using Dapr.Actors;
@@ -153,14 +153,14 @@ namespace Test
 }";
 
         var diagnostics = await GetDiagnosticsAsync(code);
-        var dapr006 = diagnostics.FirstOrDefault(d => d.Id == "DAPR006");
+        var dapr1410 = diagnostics.FirstOrDefault(d => d.Id == "DAPR1410");
 
-        Assert.IsNotNull(dapr006, "Expected DAPR006 diagnostic for method return type without serialization attributes");
-        Assert.IsTrue(dapr006.GetMessage().Contains("ComplexResult"));
+        Assert.IsNotNull(dapr1410, "Expected DAPR1410 diagnostic for method return type without serialization attributes");
+        Assert.IsTrue(dapr1410.GetMessage().Contains("ComplexResult"));
     }
 
     [TestMethod]
-    public async Task ActorMethodWithCollectionOfComplexType_ShouldReportDAPR007()
+    public async Task ActorMethodWithCollectionOfComplexType_ShouldReportDAPR1411()
     {
         var code = @"
 using Dapr.Actors;
@@ -189,11 +189,11 @@ namespace Test
 }";
 
         var diagnostics = await GetDiagnosticsAsync(code);
-        var dapr007 = diagnostics.FirstOrDefault(d => d.Id == "DAPR007");
+        var dapr1411 = diagnostics.FirstOrDefault(d => d.Id == "DAPR1411");
 
-        Assert.IsNotNull(dapr007, "Expected DAPR007 diagnostic for collection with complex element type");
-        Assert.IsTrue(dapr007.GetMessage().Contains("List"));
-        Assert.IsTrue(dapr007.GetMessage().Contains("Item"));
+        Assert.IsNotNull(dapr1411, "Expected DAPR1411 diagnostic for collection with complex element type");
+        Assert.IsTrue(dapr1411.GetMessage().Contains("List"));
+        Assert.IsTrue(dapr1411.GetMessage().Contains("Item"));
     }
 
     [TestMethod]
@@ -231,7 +231,7 @@ namespace Test
 }";
 
         var diagnostics = await GetDiagnosticsAsync(code);
-        var complexTypeDiagnostics = diagnostics.Where(d => d.Id == "DAPR005" || d.Id == "DAPR006").ToArray();
+        var complexTypeDiagnostics = diagnostics.Where(d => d.Id == "DAPR1409" || d.Id == "DAPR1410").ToArray();
 
         Assert.AreEqual(0, complexTypeDiagnostics.Length, "Should not report diagnostics for types with DataContract attribute");
     }
@@ -262,7 +262,7 @@ namespace Test
 }";
 
         var diagnostics = await GetDiagnosticsAsync(code);
-        var parameterDiagnostics = diagnostics.Where(d => d.Id == "DAPR005" || d.Id == "DAPR006").ToArray();
+        var parameterDiagnostics = diagnostics.Where(d => d.Id == "DAPR1409" || d.Id == "DAPR1410").ToArray();
 
         Assert.AreEqual(0, parameterDiagnostics.Length, "Should not report diagnostics for primitive types");
     }
@@ -289,13 +289,13 @@ namespace Test
 }";
 
         var diagnostics = await GetDiagnosticsAsync(code);
-        var enumDiagnostics = diagnostics.Where(d => d.Id == "DAPR002").ToArray();
+        var enumDiagnostics = diagnostics.Where(d => d.Id == "DAPR1406").ToArray();
 
         Assert.AreEqual(0, enumDiagnostics.Length, "Should not report diagnostics for enum members with EnumMember attribute");
     }
 
     [TestMethod]
-    public async Task RecordWithoutDataContract_ShouldReportDAPR008()
+    public async Task RecordWithoutDataContract_ShouldReportDAPR1412()
     {
         var code = @"
 using System;
@@ -320,14 +320,14 @@ namespace Test
 }";
 
         var diagnostics = await GetDiagnosticsAsync(code);
-        var dapr008 = diagnostics.FirstOrDefault(d => d.Id == "DAPR008");
+        var dapr1412 = diagnostics.FirstOrDefault(d => d.Id == "DAPR1412");
 
-        Assert.IsNotNull(dapr008, "Expected DAPR008 diagnostic for record without DataContract attribute");
-        Assert.IsTrue(dapr008.GetMessage().Contains("Doodad"));
+        Assert.IsNotNull(dapr1412, "Expected DAPR1412 diagnostic for record without DataContract attribute");
+        Assert.IsTrue(dapr1412.GetMessage().Contains("Doodad"));
     }
 
     [TestMethod]
-    public async Task RecordNotUsedInActorMethod_ShouldNotReportDAPR008()
+    public async Task RecordNotUsedInActorMethod_ShouldNotReportDAPR1412()
     {
         var code = @"
 using System;
@@ -337,13 +337,13 @@ namespace Test
     public record Standalone(Guid Id, string Name);
 }";
         var diagnostics = await GetDiagnosticsAsync(code);
-        var dapr008Diagnostics = diagnostics.Where(d => d.Id == "DAPR008").ToArray();
+        var dapr1412Diagnostics = diagnostics.Where(d => d.Id == "DAPR1412").ToArray();
 
-        Assert.AreEqual(0, dapr008Diagnostics.Length, "Should not report DAPR008 for records not used in public Dapr actor methods");
+        Assert.AreEqual(0, dapr1412Diagnostics.Length, "Should not report DAPR1412 for records not used in public Dapr actor methods");
     }
 
     [TestMethod]
-    public async Task RecordWithDataContractButMissingDataMember_ShouldReportDAPR008()
+    public async Task RecordWithDataContractButMissingDataMember_ShouldReportDAPR1412()
     {
         var code = @"
 using System;
@@ -369,13 +369,13 @@ namespace Test
     }
 }";
         var diagnostics = await GetDiagnosticsAsync(code);
-        var dapr008Diagnostics = diagnostics.Where(d => d.Id == "DAPR008").ToArray();
+        var dapr1412Diagnostics = diagnostics.Where(d => d.Id == "DAPR1412").ToArray();
 
-        Assert.IsTrue(dapr008Diagnostics.Length > 0, "Expected DAPR008 diagnostics for record parameters without DataMember attributes");
+        Assert.IsTrue(dapr1412Diagnostics.Length > 0, "Expected DAPR1412 diagnostics for record parameters without DataMember attributes");
     }
 
     [TestMethod]
-    public async Task RecordWithProperDataContractAndDataMember_ShouldNotReportDAPR008()
+    public async Task RecordWithProperDataContractAndDataMember_ShouldNotReportDAPR1412()
     {
         var code = @"
 using System;
@@ -404,13 +404,13 @@ namespace Test
     }
 }";
         var diagnostics = await GetDiagnosticsAsync(code);
-        var dapr008Diagnostics = diagnostics.Where(d => d.Id == "DAPR008").ToArray();
+        var dapr1412Diagnostics = diagnostics.Where(d => d.Id == "DAPR1412").ToArray();
 
-        Assert.AreEqual(0, dapr008Diagnostics.Length, "Should not report diagnostics for record with proper DataContract and DataMember attributes");
+        Assert.AreEqual(0, dapr1412Diagnostics.Length, "Should not report diagnostics for record with proper DataContract and DataMember attributes");
     }
 
     [TestMethod]
-    public async Task RecordUsedInActorMethod_ShouldReportDAPR008WhenMissingAttributes()
+    public async Task RecordUsedInActorMethod_ShouldReportDAPR1412WhenMissingAttributes()
     {
         var code = @"
 using System;
@@ -435,14 +435,14 @@ namespace Test
     }
 }";
         var diagnostics = await GetDiagnosticsAsync(code);
-        var dapr008 = diagnostics.FirstOrDefault(d => d.Id == "DAPR008");
+        var dapr1412 = diagnostics.FirstOrDefault(d => d.Id == "DAPR1412");
 
-        Assert.IsNotNull(dapr008, "Expected DAPR008 diagnostic for record used in Actor method without proper attributes");
-        Assert.IsTrue(dapr008.GetMessage().Contains("UserData"));
+        Assert.IsNotNull(dapr1412, "Expected DAPR1412 diagnostic for record used in Actor method without proper attributes");
+        Assert.IsTrue(dapr1412.GetMessage().Contains("UserData"));
     }
 
     [TestMethod]
-    public async Task ActorClass_WithoutIActorInterface_ShouldReportDAPR009()
+    public async Task ActorClass_WithoutIActorInterface_ShouldReportDAPR1413()
     {
         var code = @"
 using Dapr.Actors;
@@ -458,14 +458,14 @@ namespace Test
     }
 }";
         var diagnostics = await GetDiagnosticsAsync(code);
-        var dapr009 = diagnostics.FirstOrDefault(d => d.Id == "DAPR009");
+        var dapr1413 = diagnostics.FirstOrDefault(d => d.Id == "DAPR1413");
 
-        Assert.IsNotNull(dapr009, "Expected DAPR009 diagnostic for Actor class without IActor interface");
-        Assert.IsTrue(dapr009.GetMessage().Contains("TestActor"));
+        Assert.IsNotNull(dapr1413, "Expected DAPR1413 diagnostic for Actor class without IActor interface");
+        Assert.IsTrue(dapr1413.GetMessage().Contains("TestActor"));
     }
 
     [TestMethod]
-    public async Task ActorClass_WithIActorInterface_ShouldNotReportDAPR009()
+    public async Task ActorClass_WithIActorInterface_ShouldNotReportDAPR1413()
     {
         var code = @"
 using Dapr.Actors;
@@ -486,13 +486,13 @@ namespace Test
     }
 }";
         var diagnostics = await GetDiagnosticsAsync(code);
-        var dapr009 = diagnostics.FirstOrDefault(d => d.Id == "DAPR009");
+        var dapr1413 = diagnostics.FirstOrDefault(d => d.Id == "DAPR1413");
 
-        Assert.IsNull(dapr009, "Should not report DAPR009 for Actor class with proper IActor interface");
+        Assert.IsNull(dapr1413, "Should not report DAPR1413 for Actor class with proper IActor interface");
     }
 
     [TestMethod]
-    public async Task TypeWithoutParameterlessConstructorOrDataContract_ShouldReportDAPR010()
+    public async Task TypeWithoutParameterlessConstructorOrDataContract_ShouldReportDAPR1414()
     {
         var code = @"
 using Dapr.Actors;
@@ -527,14 +527,14 @@ namespace Test
     }
 }";
         var diagnostics = await GetDiagnosticsAsync(code);
-        var dapr010 = diagnostics.FirstOrDefault(d => d.Id == "DAPR010");
+        var dapr1414 = diagnostics.FirstOrDefault(d => d.Id == "DAPR1414");
 
-        Assert.IsNotNull(dapr010, "Expected DAPR010 diagnostic for type without parameterless constructor or DataContract");
-        Assert.IsTrue(dapr010.GetMessage().Contains("TypeWithoutParameterlessConstructor"));
+        Assert.IsNotNull(dapr1414, "Expected DAPR1414 diagnostic for type without parameterless constructor or DataContract");
+        Assert.IsTrue(dapr1414.GetMessage().Contains("TypeWithoutParameterlessConstructor"));
     }
 
     [TestMethod]
-    public async Task TypeWithDataContract_ShouldNotReportDAPR010()
+    public async Task TypeWithDataContract_ShouldNotReportDAPR1414()
     {
         var code = @"
 using Dapr.Actors;
@@ -572,13 +572,13 @@ namespace Test
     }
 }";
         var diagnostics = await GetDiagnosticsAsync(code);
-        var dapr010 = diagnostics.FirstOrDefault(d => d.Id == "DAPR010");
+        var dapr1414 = diagnostics.FirstOrDefault(d => d.Id == "DAPR1414");
 
-        Assert.IsNull(dapr010, "Should not report DAPR010 for type with DataContract attribute");
+        Assert.IsNull(dapr1414, "Should not report DAPR1414 for type with DataContract attribute");
     }
 
     [TestMethod]
-    public async Task TypeWithParameterlessConstructor_ShouldNotReportDAPR010()
+    public async Task TypeWithParameterlessConstructor_ShouldNotReportDAPR1414()
     {
         var code = @"
 using Dapr.Actors;
@@ -617,8 +617,8 @@ namespace Test
     }
 }";
         var diagnostics = await GetDiagnosticsAsync(code);
-        var dapr010 = diagnostics.FirstOrDefault(d => d.Id == "DAPR010");
+        var dapr1414 = diagnostics.FirstOrDefault(d => d.Id == "DAPR1414");
 
-        Assert.IsNull(dapr010, "Should not report DAPR010 for type with parameterless constructor");
+        Assert.IsNull(dapr1414, "Should not report DAPR1414 for type with parameterless constructor");
     }
 }

@@ -1,31 +1,53 @@
+// ------------------------------------------------------------------------
+//  Copyright 2025 The Dapr Authors
+//  Licensed under the Apache License, Version 2.0 (the "License");
+//  you may not use this file except in compliance with the License.
+//  You may obtain a copy of the License at
+//      http://www.apache.org/licenses/LICENSE-2.0
+//  Unless required by applicable law or agreed to in writing, software
+//  distributed under the License is distributed on an "AS IS" BASIS,
+//  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//  See the License for the specific language governing permissions and
+//  limitations under the License.
+//  ------------------------------------------------------------------------
+
+using System.Collections.Immutable;
+using System.Composition;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CodeActions;
 using Microsoft.CodeAnalysis.CodeFixes;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using System.Collections.Immutable;
-using System.Composition;
 
-namespace Dapr.Analyzers;
+namespace Dapr.Actors.Analyzers;
 
-[ExportCodeFixProvider(LanguageNames.CSharp, Name = nameof(DaprActorCodeFixProvider)), Shared]
-public class DaprActorCodeFixProvider : CodeFixProvider
+/// <summary>
+/// Provides code fixes for Actor serialization diagnostics.
+/// </summary>
+[ExportCodeFixProvider(LanguageNames.CSharp, Name = nameof(ActorSerializationCodeFixProvider)), Shared]
+public sealed class ActorSerializationCodeFixProvider : CodeFixProvider
 {
+    /// <inheritdoc />
     public override ImmutableArray<string> FixableDiagnosticIds =>
         ImmutableArray.Create(
-            DaprActorAnalyzer.ActorInterfaceMissingIActor.Id,
-            DaprActorAnalyzer.EnumMissingEnumMemberAttribute.Id,
-            DaprActorAnalyzer.WeaklyTypedActorJsonPropertyRecommendation.Id,
-            DaprActorAnalyzer.ComplexTypeInActorNeedsAttributes.Id,
-            DaprActorAnalyzer.RecordTypeNeedsDataContractAttributes.Id
+            ActorSerializationAnalyzer.ActorInterfaceMissingIActor.Id,
+            ActorSerializationAnalyzer.EnumMissingEnumMemberAttribute.Id,
+            ActorSerializationAnalyzer.WeaklyTypedActorJsonPropertyRecommendation.Id,
+            ActorSerializationAnalyzer.ComplexTypeInActorNeedsAttributes.Id,
+            ActorSerializationAnalyzer.RecordTypeNeedsDataContractAttributes.Id
         );
 
+    /// <inheritdoc />
     public override FixAllProvider GetFixAllProvider() => WellKnownFixAllProviders.BatchFixer;
 
+    /// <inheritdoc />
     public override async Task RegisterCodeFixesAsync(CodeFixContext context)
     {
         var root = await context.Document.GetSyntaxRootAsync(context.CancellationToken).ConfigureAwait(false);
-        if (root == null) return;
+        if (root == null)
+        {
+            return;
+        }
 
         foreach (var diagnostic in context.Diagnostics)
         {
@@ -34,25 +56,25 @@ public class DaprActorCodeFixProvider : CodeFixProvider
 
             switch (diagnostic.Id)
             {
-                case "DAPR001": // Actor interface missing IActor
+                case "DAPR1405": // Actor interface missing IActor
                     RegisterAddIActorInterfaceFix(context, root, node, diagnostic);
                     break;
 
-                case "DAPR002": // Missing EnumMember
+                case "DAPR1406": // Missing EnumMember
                     RegisterAddEnumMemberFix(context, root, node, diagnostic);
                     break;
 
-                case "DAPR003": // JsonPropertyName recommendation
+                case "DAPR1407": // JsonPropertyName recommendation
                     RegisterAddJsonPropertyNameFix(context, root, node, diagnostic);
                     break;
 
-                case "DAPR004": // Complex type needs attributes
-                case "DAPR005": // Method parameter needs validation
-                case "DAPR006": // Method return type needs validation
+                case "DAPR1408": // Complex type needs attributes
+                case "DAPR1409": // Method parameter needs validation
+                case "DAPR1410": // Method return type needs validation
                     RegisterAddDataContractFix(context, root, node, diagnostic);
                     break;
 
-                case "DAPR008": // Record needs DataContract and DataMember attributes
+                case "DAPR1412": // Record needs DataContract and DataMember attributes
                     RegisterAddRecordDataContractFix(context, root, node, diagnostic);
                     break;
             }
@@ -61,7 +83,10 @@ public class DaprActorCodeFixProvider : CodeFixProvider
 
     private static void RegisterAddIActorInterfaceFix(CodeFixContext context, SyntaxNode root, SyntaxNode node, Diagnostic diagnostic)
     {
-        if (node is not InterfaceDeclarationSyntax interfaceDeclaration) return;
+        if (node is not InterfaceDeclarationSyntax interfaceDeclaration)
+        {
+            return;
+        }
 
         var action = CodeAction.Create(
             title: "Add IActor inheritance",
@@ -73,7 +98,10 @@ public class DaprActorCodeFixProvider : CodeFixProvider
 
     private static void RegisterAddEnumMemberFix(CodeFixContext context, SyntaxNode root, SyntaxNode node, Diagnostic diagnostic)
     {
-        if (node is not EnumMemberDeclarationSyntax enumMemberDeclaration) return;
+        if (node is not EnumMemberDeclarationSyntax enumMemberDeclaration)
+        {
+            return;
+        }
 
         var action = CodeAction.Create(
             title: "Add [EnumMember] attribute",
@@ -85,7 +113,10 @@ public class DaprActorCodeFixProvider : CodeFixProvider
 
     private static void RegisterAddJsonPropertyNameFix(CodeFixContext context, SyntaxNode root, SyntaxNode node, Diagnostic diagnostic)
     {
-        if (node is not PropertyDeclarationSyntax propertyDeclaration) return;
+        if (node is not PropertyDeclarationSyntax propertyDeclaration)
+        {
+            return;
+        }
 
         var action = CodeAction.Create(
             title: "Add [JsonPropertyName] attribute",
@@ -130,7 +161,6 @@ public class DaprActorCodeFixProvider : CodeFixProvider
         }
         else if (node is ParameterSyntax parameter)
         {
-            // Find the parent record declaration
             var parentRecord = parameter.Ancestors().OfType<RecordDeclarationSyntax>().FirstOrDefault();
             if (parentRecord != null)
             {
@@ -161,7 +191,6 @@ public class DaprActorCodeFixProvider : CodeFixProvider
         var newInterfaceDeclaration = interfaceDeclaration.WithBaseList(baseList);
         var newRoot = root.ReplaceNode(interfaceDeclaration, newInterfaceDeclaration);
 
-        // Add using statement if not present
         newRoot = AddUsingIfMissing(newRoot, "Dapr.Actors");
 
         return Task.FromResult(document.WithSyntaxRoot(newRoot));
@@ -175,7 +204,6 @@ public class DaprActorCodeFixProvider : CodeFixProvider
         var newEnumMemberDeclaration = enumMemberDeclaration.AddAttributeLists(attributeList);
         var newRoot = root.ReplaceNode(enumMemberDeclaration, newEnumMemberDeclaration);
 
-        // Add using statement if not present
         newRoot = AddUsingIfMissing(newRoot, "System.Runtime.Serialization");
 
         return Task.FromResult(document.WithSyntaxRoot(newRoot));
@@ -184,6 +212,11 @@ public class DaprActorCodeFixProvider : CodeFixProvider
     private static Task<Document> AddJsonPropertyNameAttribute(Document document, SyntaxNode root, PropertyDeclarationSyntax propertyDeclaration, CancellationToken cancellationToken)
     {
         var propertyName = propertyDeclaration.Identifier.ValueText;
+        if (string.IsNullOrEmpty(propertyName))
+        {
+            return Task.FromResult(document);
+        }
+
         var camelCaseName = char.ToLowerInvariant(propertyName[0]) + propertyName.Substring(1);
 
         var jsonPropertyNameAttribute = SyntaxFactory.Attribute(
@@ -200,7 +233,6 @@ public class DaprActorCodeFixProvider : CodeFixProvider
         var newPropertyDeclaration = propertyDeclaration.AddAttributeLists(attributeList);
         var newRoot = root.ReplaceNode(propertyDeclaration, newPropertyDeclaration);
 
-        // Add using statement if not present
         newRoot = AddUsingIfMissing(newRoot, "System.Text.Json.Serialization");
 
         return Task.FromResult(document.WithSyntaxRoot(newRoot));
@@ -214,7 +246,6 @@ public class DaprActorCodeFixProvider : CodeFixProvider
         var newClassDeclaration = classDeclaration.AddAttributeLists(attributeList);
         var newRoot = root.ReplaceNode(classDeclaration, newClassDeclaration);
 
-        // Add using statement if not present
         newRoot = AddUsingIfMissing(newRoot, "System.Runtime.Serialization");
 
         return Task.FromResult(document.WithSyntaxRoot(newRoot));
@@ -228,7 +259,6 @@ public class DaprActorCodeFixProvider : CodeFixProvider
         var newStructDeclaration = structDeclaration.AddAttributeLists(attributeList);
         var newRoot = root.ReplaceNode(structDeclaration, newStructDeclaration);
 
-        // Add using statement if not present
         newRoot = AddUsingIfMissing(newRoot, "System.Runtime.Serialization");
 
         return Task.FromResult(document.WithSyntaxRoot(newRoot));
@@ -238,20 +268,17 @@ public class DaprActorCodeFixProvider : CodeFixProvider
     {
         var newRoot = root;
 
-        // Add DataContract attribute to the record if not present
         var dataContractAttribute = SyntaxFactory.Attribute(SyntaxFactory.IdentifierName("DataContract"));
         var dataContractAttributeList = SyntaxFactory.AttributeList(SyntaxFactory.SingletonSeparatedList(dataContractAttribute));
 
         var newRecordDeclaration = recordDeclaration.AddAttributeLists(dataContractAttributeList);
 
-        // Add DataMember attributes to parameters
         if (recordDeclaration.ParameterList != null)
         {
             var newParameters = new List<ParameterSyntax>();
 
             foreach (var parameter in recordDeclaration.ParameterList.Parameters)
             {
-                // Check if parameter already has DataMember attribute
                 if (!parameter.AttributeLists.Any(al => al.Attributes.Any(a => a.Name.ToString().Contains("DataMember"))))
                 {
                     var dataMemberAttribute = SyntaxFactory.Attribute(SyntaxFactory.IdentifierName("DataMember"));
@@ -259,8 +286,7 @@ public class DaprActorCodeFixProvider : CodeFixProvider
                         SyntaxFactory.SingletonSeparatedList(dataMemberAttribute))
                         .WithTarget(SyntaxFactory.AttributeTargetSpecifier(SyntaxFactory.Token(SyntaxKind.PropertyKeyword)));
 
-                    var newParameter = parameter.AddAttributeLists(dataMemberAttributeList);
-                    newParameters.Add(newParameter);
+                    newParameters.Add(parameter.AddAttributeLists(dataMemberAttributeList));
                 }
                 else
                 {
@@ -274,7 +300,6 @@ public class DaprActorCodeFixProvider : CodeFixProvider
 
         newRoot = newRoot.ReplaceNode(recordDeclaration, newRecordDeclaration);
 
-        // Add using statement if not present
         newRoot = AddUsingIfMissing(newRoot, "System.Runtime.Serialization");
 
         return Task.FromResult(document.WithSyntaxRoot(newRoot));
@@ -290,7 +315,6 @@ public class DaprActorCodeFixProvider : CodeFixProvider
         var newParameter = parameter.AddAttributeLists(attributeList);
         var newRoot = root.ReplaceNode(parameter, newParameter);
 
-        // Add using statement if not present
         newRoot = AddUsingIfMissing(newRoot, "System.Runtime.Serialization");
 
         return Task.FromResult(document.WithSyntaxRoot(newRoot));
@@ -303,11 +327,10 @@ public class DaprActorCodeFixProvider : CodeFixProvider
             var usingDirective = SyntaxFactory.UsingDirective(SyntaxFactory.IdentifierName(namespaceName));
             return compilationUnit.AddUsings(usingDirective);
         }
+
         return root;
     }
 
-    private static bool HasUsingDirective(CompilationUnitSyntax compilationUnit, string namespaceName)
-    {
-        return compilationUnit.Usings.Any(u => u.Name?.ToString() == namespaceName);
-    }
+    private static bool HasUsingDirective(CompilationUnitSyntax compilationUnit, string namespaceName) =>
+        compilationUnit.Usings.Any(u => u.Name?.ToString() == namespaceName);
 }
